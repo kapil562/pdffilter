@@ -15,14 +15,8 @@ export default function AddressChecker() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSize, setSelectedSize] = useState("");
   const [darkMode, setDarkMode] = useState(false);
-  const [dashboardStats, setDashboardStats] = useState({
-    totalBlocks: 0,
-    sizeCount: {},
-    totalPrice: "0.00",
-    codCount: 0,
-    prepaidCount: 0,
-    codDuplicateCount: 0,
-  });
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
 
   useEffect(() => {
     document.body.classList.toggle("dark", darkMode);
@@ -130,41 +124,6 @@ export default function AddressChecker() {
       setProgress(Math.round(((i + 1) / files.length) * 100));
     }
 
-    const sizeMap = {};
-    let grandTotal = 0;
-    let codOrders = 0;
-    let prepaidOrders = 0;
-
-    allResults.forEach(({ size, total, mode }) => {
-      sizeMap[size] = (sizeMap[size] || 0) + 1;
-      if (total.startsWith("Rs.")) {
-        grandTotal += parseFloat(total.replace("Rs.", ""));
-      }
-      if (mode === "COD") codOrders++;
-      if (mode === "PREPAID") prepaidOrders++;
-    });
-
-    const uniqueOrders = new Set();
-    let codDuplicateCount = 0;
-
-    allResults.forEach(({ name, address1, address2, mode }) => {
-      const key = `${name.toLowerCase()}|${address1.toLowerCase()}|${address2.toLowerCase()}|${mode}`;
-      if (uniqueOrders.has(key)) {
-        if (mode === "COD") codDuplicateCount++;
-      } else {
-        uniqueOrders.add(key);
-      }
-    });
-
-    setDashboardStats({
-      totalBlocks: allResults.length,
-      sizeCount: sizeMap,
-      totalPrice: grandTotal.toFixed(2),
-      codCount: codOrders,
-      prepaidCount: prepaidOrders,
-      codDuplicateCount,
-    });
-
     setResults(allResults);
     setProgress(0);
   };
@@ -193,6 +152,7 @@ export default function AddressChecker() {
     saveAs(dataBlob, "extracted_data.xlsx");
   };
 
+  // ✅ Filtering logic
   const filteredResults = results.filter((item) => {
     const query = searchQuery.toLowerCase();
     const matchesSearch =
@@ -208,8 +168,54 @@ export default function AddressChecker() {
       item.mode.toLowerCase().includes(query);
 
     const matchesSize = selectedSize ? item.size === selectedSize : true;
-    return matchesSearch && matchesSize;
+
+    const priceValue = parseFloat(item.total.replace("Rs.", "")) || 0;
+    const matchesPrice =
+      (!minPrice || priceValue >= parseFloat(minPrice)) &&
+      (!maxPrice || priceValue <= parseFloat(maxPrice));
+
+    return matchesSearch && matchesSize && matchesPrice;
   });
+
+  // ✅ Dashboard calculation on filtered data
+  const calculateStats = (data) => {
+    const sizeMap = {};
+    let grandTotal = 0;
+    let codOrders = 0;
+    let prepaidOrders = 0;
+
+    data.forEach(({ size, total, mode }) => {
+      sizeMap[size] = (sizeMap[size] || 0) + 1;
+      if (total.startsWith("Rs.")) {
+        grandTotal += parseFloat(total.replace("Rs.", ""));
+      }
+      if (mode === "COD") codOrders++;
+      if (mode === "PREPAID") prepaidOrders++;
+    });
+
+    const uniqueOrders = new Set();
+    let codDuplicateCount = 0;
+
+    data.forEach(({ name, address1, address2, mode }) => {
+      const key = `${name.toLowerCase()}|${address1.toLowerCase()}|${address2.toLowerCase()}|${mode}`;
+      if (uniqueOrders.has(key)) {
+        if (mode === "COD") codDuplicateCount++;
+      } else {
+        uniqueOrders.add(key);
+      }
+    });
+
+    return {
+      totalBlocks: data.length,
+      sizeCount: sizeMap,
+      totalPrice: grandTotal.toFixed(2),
+      codCount: codOrders,
+      prepaidCount: prepaidOrders,
+      codDuplicateCount,
+    };
+  };
+
+  const stats = calculateStats(filteredResults);
 
   return (
     <div className="container">
@@ -245,14 +251,14 @@ export default function AddressChecker() {
             </button>
 
             <div className="dashboard-glass">
-              <div className="stat">Total Orders: <strong>{dashboardStats.totalBlocks}</strong></div>
-              <div className="stat">Total: <strong>Rs.{dashboardStats.totalPrice}</strong></div>
-              <div className="stat">COD Orders: <strong>{dashboardStats.codCount}</strong></div>
-              <div className="stat">Prepaid Orders: <strong>{dashboardStats.prepaidCount}</strong></div>
-              <div className="stat">COD Duplicates: <strong>{dashboardStats.codDuplicateCount}</strong></div>
-              <div className="stat">COD Unique Orders: <strong>{dashboardStats.codCount - dashboardStats.codDuplicateCount}</strong></div>
+              <div className="stat">Total Orders: <strong>{stats.totalBlocks}</strong></div>
+              <div className="stat">Total: <strong>Rs.{stats.totalPrice}</strong></div>
+              <div className="stat">COD Orders: <strong>{stats.codCount}</strong></div>
+              <div className="stat">Prepaid Orders: <strong>{stats.prepaidCount}</strong></div>
+              <div className="stat">COD Duplicates: <strong>{stats.codDuplicateCount}</strong></div>
+              <div className="stat">COD Unique Orders: <strong>{stats.codCount - stats.codDuplicateCount}</strong></div>
               <div className="sizes">
-                {Object.entries(dashboardStats.sizeCount).map(([size, count]) => (
+                {Object.entries(stats.sizeCount).map(([size, count]) => (
                   <span key={size} className="size-chip">{size}: {count}</span>
                 ))}
               </div>
@@ -276,6 +282,31 @@ export default function AddressChecker() {
                   {size}
                 </button>
               ))}
+            </div>
+
+            {/* ✅ Price Range Filter */}
+            <div className="price-filter">
+              <input
+                type="number"
+                placeholder="Min Price"
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+              />
+              <input
+                type="number"
+                placeholder="Max Price"
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
+              />
+              <button
+                className="glass-button"
+                onClick={() => {
+                  setMinPrice("");
+                  setMaxPrice("");
+                }}
+              >
+                Clear
+              </button>
             </div>
           </>
         )}
