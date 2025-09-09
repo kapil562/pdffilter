@@ -283,3 +283,13 @@ body.dark .badge {
     transform: rotate(360deg);
   }
 }
+.price-filter {
+  display: flex;
+  gap: 10px;
+  margin: 15px 0;
+  justify-content: center;
+}
+
+.small-input {
+  max-width: 120px;
+}
