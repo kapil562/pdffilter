@@ -421,7 +421,7 @@ export default function AddressChecker() {
                   <div>
                     <strong>City:</strong> {item.city},{" "}
                     <strong>State:</strong> {item.state},{" "}
-                    <strong>Pincode:</strong> {item.pincode}
+                    <strong>Pincodes:</strong> {item.pincode}
                   </div>
                 </div>
 
