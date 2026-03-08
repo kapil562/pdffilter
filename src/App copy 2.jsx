@@ -62,23 +62,12 @@ export default function AddressChecker() {
                 const phone = phoneMatch ? phoneMatch[0] : "None";
 
                 const addressEnd = section.search(/If undelivered|COD|Prepaid|Pickup/i);
-                const raw =
-                  addressEnd !== -1
-                    ? section.substring(0, addressEnd).trim()
-                    : section.trim();
+                const raw = addressEnd !== -1 ? section.substring(0, addressEnd).trim() : section.trim();
+                const lines = raw.split("\n").map(line => line.trim()).filter(Boolean);
 
-                const lines = raw
-                  .split("\n")
-                  .map((line) => line.trim())
-                  .filter(Boolean);
+                const name = lines[0] ? lines[0].toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()) : "Unknown";
 
-                const name = lines[0]
-                  ? lines[0].toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
-                  : "Unknown";
-
-                let address1 = "None",
-                  address2 = "None";
-
+                let address1 = "None", address2 = "None";
                 if (lines.length >= 4) {
                   const addressLines = lines.slice(1, -1);
                   const mid = Math.ceil(addressLines.length / 2);
@@ -86,13 +75,14 @@ export default function AddressChecker() {
                   address2 = addressLines.slice(mid).join(", ");
                 } else if (lines.length === 3) {
                   address1 = lines[1];
+                  address2 = "None";
                 } else if (lines.length === 2) {
                   address1 = lines[1];
+                  address2 = "None";
                 }
 
                 const lastLine = lines[lines.length - 1] || "";
-                const lastLineParts = lastLine.split(",").map((s) => s.trim());
-
+                const lastLineParts = lastLine.split(",").map(s => s.trim());
                 const city = lastLineParts[lastLineParts.length - 3] || "Unknown";
                 const state = lastLineParts[lastLineParts.length - 2] || "Unknown";
                 const pincode = lastLineParts[lastLineParts.length - 1] || "Unknown";
@@ -102,23 +92,11 @@ export default function AddressChecker() {
                 );
                 const size = sizeMatch ? sizeMatch[1] : "Not found";
 
-                const totalMatch = section.match(
-                  /Total\s+(Rs\.\d+\.\d{2})\s+(Rs\.\d+\.\d{2})/i
-                );
+                const totalMatch = section.match(/Total\s+(Rs\.\d+\.\d{2})\s+(Rs\.\d+\.\d{2})/i);
                 const finalTotal = totalMatch ? totalMatch[2] : "Not found";
 
-                // 🔥 Advanced Payment Mode Detection
-                let mode = "Unknown";
-
-                if (/Prepaid/i.test(section)) {
-                  mode = "PREPAID";
-                } else if (
-                  /COD/i.test(section) ||
-                  /Check the payable amount on the app/i.test(section) ||
-                  /Payable amount/i.test(section)
-                ) {
-                  mode = "COD";
-                }
+                const modeMatch = section.match(/(COD|Prepaid)\s*:/i);
+                const mode = modeMatch ? modeMatch[1].toUpperCase() : "Unknown";
 
                 return {
                   name,
@@ -174,9 +152,9 @@ export default function AddressChecker() {
     saveAs(dataBlob, "extracted_data.xlsx");
   };
 
+  // ✅ Filtering logic
   const filteredResults = results.filter((item) => {
     const query = searchQuery.toLowerCase();
-
     const matchesSearch =
       item.name.toLowerCase().includes(query) ||
       item.phone.toLowerCase().includes(query) ||
@@ -192,7 +170,6 @@ export default function AddressChecker() {
     const matchesSize = selectedSize ? item.size === selectedSize : true;
 
     const priceValue = parseFloat(item.total.replace("Rs.", "")) || 0;
-
     const matchesPrice =
       (!minPrice || priceValue >= parseFloat(minPrice)) &&
       (!maxPrice || priceValue <= parseFloat(maxPrice));
@@ -200,6 +177,7 @@ export default function AddressChecker() {
     return matchesSearch && matchesSize && matchesPrice;
   });
 
+  // ✅ Dashboard calculation on filtered data
   const calculateStats = (data) => {
     const sizeMap = {};
     let grandTotal = 0;
@@ -208,11 +186,9 @@ export default function AddressChecker() {
 
     data.forEach(({ size, total, mode }) => {
       sizeMap[size] = (sizeMap[size] || 0) + 1;
-
       if (total.startsWith("Rs.")) {
         grandTotal += parseFloat(total.replace("Rs.", ""));
       }
-
       if (mode === "COD") codOrders++;
       if (mode === "PREPAID") prepaidOrders++;
     });
@@ -222,7 +198,6 @@ export default function AddressChecker() {
 
     data.forEach(({ name, address1, address2, mode }) => {
       const key = `${name.toLowerCase()}|${address1.toLowerCase()}|${address2.toLowerCase()}|${mode}`;
-
       if (uniqueOrders.has(key)) {
         if (mode === "COD") codDuplicateCount++;
       } else {
@@ -256,7 +231,6 @@ export default function AddressChecker() {
           <label htmlFor="pdfUpload" className="glass-button">
             <Upload size={18} /> Upload PDFs
           </label>
-
           <input
             type="file"
             accept="application/pdf"
@@ -265,12 +239,8 @@ export default function AddressChecker() {
             className="hidden-input"
             id="pdfUpload"
           />
-
-          <button
-            className="glass-toggle"
-            onClick={() => setDarkMode(!darkMode)}
-          >
-            {darkMode ? "☀ Light Mode" : "🌙 Dark Mode"}
+          <button className="glass-toggle" onClick={() => setDarkMode(!darkMode)}>
+            {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
           </button>
         </div>
 
@@ -281,36 +251,15 @@ export default function AddressChecker() {
             </button>
 
             <div className="dashboard-glass">
-              <div className="stat">
-                Total Orders: <strong>{stats.totalBlocks}</strong>
-              </div>
-
-              <div className="stat">
-                Total: <strong>Rs.{stats.totalPrice}</strong>
-              </div>
-
-              <div className="stat">
-                COD Orders: <strong>{stats.codCount}</strong>
-              </div>
-
-              <div className="stat">
-                Prepaid Orders: <strong>{stats.prepaidCount}</strong>
-              </div>
-
-              <div className="stat">
-                COD Duplicates: <strong>{stats.codDuplicateCount}</strong>
-              </div>
-
-              <div className="stat">
-                COD Unique Orders:{" "}
-                <strong>{stats.codCount - stats.codDuplicateCount}</strong>
-              </div>
-
+              <div className="stat">Total Orders: <strong>{stats.totalBlocks}</strong></div>
+              <div className="stat">Total: <strong>Rs.{stats.totalPrice}</strong></div>
+              <div className="stat">COD Orders: <strong>{stats.codCount}</strong></div>
+              <div className="stat">Prepaid Orders: <strong>{stats.prepaidCount}</strong></div>
+              <div className="stat">COD Duplicates: <strong>{stats.codDuplicateCount}</strong></div>
+              <div className="stat">COD Unique Orders: <strong>{stats.codCount - stats.codDuplicateCount}</strong></div>
               <div className="sizes">
                 {Object.entries(stats.sizeCount).map(([size, count]) => (
-                  <span key={size} className="size-chip">
-                    {size}: {count}
-                  </span>
+                  <span key={size} className="size-chip">{size}: {count}</span>
                 ))}
               </div>
             </div>
@@ -324,32 +273,18 @@ export default function AddressChecker() {
             />
 
             <div className="filter-glass">
-              {[
-                "XS",
-                "S",
-                "M",
-                "L",
-                "XL",
-                "XXL",
-                "XXXL",
-                "4XL",
-                "5XL",
-                "6XL",
-              ].map((size) => (
+              {["XS", "S", "M", "L", "XL", "XXL", "XXXL", "4XL", "5XL", "6XL"].map((size) => (
                 <button
                   key={size}
-                  onClick={() =>
-                    setSelectedSize(selectedSize === size ? "" : size)
-                  }
-                  className={`filter-chip ${
-                    selectedSize === size ? "active" : ""
-                  }`}
+                  onClick={() => setSelectedSize(selectedSize === size ? "" : size)}
+                  className={`filter-chip ${selectedSize === size ? "active" : ""}`}
                 >
                   {size}
                 </button>
               ))}
             </div>
 
+            {/* ✅ Price Range Filter */}
             <div className="price-filter">
               <input
                 type="number"
@@ -357,14 +292,12 @@ export default function AddressChecker() {
                 value={minPrice}
                 onChange={(e) => setMinPrice(e.target.value)}
               />
-
               <input
                 type="number"
                 placeholder="Max Price"
                 value={maxPrice}
                 onChange={(e) => setMaxPrice(e.target.value)}
               />
-
               <button
                 className="glass-button"
                 onClick={() => {
@@ -381,12 +314,8 @@ export default function AddressChecker() {
         {progress > 0 ? (
           <>
             <div className="progress-container">
-              <div
-                className="progress-bar"
-                style={{ width: `${progress}%` }}
-              />
+              <div className="progress-bar" style={{ width: `${progress}%` }} />
             </div>
-
             <p className="progress-text">{progress}% done</p>
           </>
         ) : filteredResults.length > 0 ? (
@@ -400,31 +329,13 @@ export default function AddressChecker() {
                 transition={{ duration: 0.4 }}
               >
                 <div className="label">Block #{idx + 1}</div>
-
                 <div className="block-text formatted-text">
-                  <div>
-                    <strong>Name:</strong> {item.name}
-                  </div>
-
-                  <div>
-                    <strong>Phone:</strong> {item.phone}
-                  </div>
-
-                  <div>
-                    <strong>Address 1:</strong> {item.address1}
-                  </div>
-
-                  <div>
-                    <strong>Address 2:</strong> {item.address2}
-                  </div>
-
-                  <div>
-                    <strong>City:</strong> {item.city},{" "}
-                    <strong>State:</strong> {item.state},{" "}
-                    <strong>Pincode:</strong> {item.pincode}
-                  </div>
+                  <div><strong>Name:</strong> {item.name}</div>
+                  <div><strong>Phone:</strong> {item.phone}</div>
+                  <div><strong>Address 1:</strong> {item.address1}</div>
+                  <div><strong>Address 2:</strong> {item.address2}</div>
+                  <div><strong>City:</strong> {item.city}, <strong>State:</strong> {item.state}, <strong>Pincode:</strong> {item.pincode}</div>
                 </div>
-
                 <div className="badge">Size: {item.size}</div>
                 <div className="badge green">Price: {item.total}</div>
                 <div className="badge yellow">Mode: {item.mode}</div>
