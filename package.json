@@ -33,7 +33,7 @@
   },
   "optionalDependencies": {
     "electron": "^30.0.0",
-    "electron-builder": "^24.14.1"
+    "electron-builder": "^25.1.8"
   },
   "build": {
     "appId": "com.smart.address.extractor",
